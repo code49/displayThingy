@@ -3,13 +3,28 @@ import time
 import requests
 import pygame
 import io
+from datetime import datetime
+import pytz
 from spotify import get_spotify_client, get_current_track_info, get_interpolated_progress
 
 # --- Constants ---
 WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 600
-ALBUM_ART_SIZE = 450
+ALBUM_ART_SIZE = 500
 FPS = 60
+
+# World Clock Config
+REFERENCE_LOCATION = "AUS" # Our "Home" location
+WORLD_CLOCKS = [
+    {"name": "SFO", "tz": "America/Los_Angeles"},
+    {"name": "AUS", "tz": "America/Chicago"},
+    {"name": "PIT", "tz": "America/New_York"},
+    # {"name": "LON", "tz": "Europe/London"},
+    # {"name": "HKG", "tz": "Asia/Hong_Kong"},
+    # {"name": "TYO", "tz": "Asia/Tokyo"},
+]
+CLOCK_CYCLE_INTERVAL = 30 # Seconds per city
+
 
 # Colors
 COLOR_BG = (18, 18, 18)        # Spotify Dark
@@ -39,6 +54,16 @@ class SpotifyDisplay:
         self.last_sync_time = 0
         self.album_art = None
         self.current_cover_url = None
+        
+        # Clock State
+        self.clock_index = 0
+        self.last_clock_cycle = time.time()
+        
+        # Dimming State
+        self.dimmed = False
+        self.dim_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.dim_surface.set_alpha(180) # 0 is transparent, 255 is solid black
+        self.dim_surface.fill((0, 0, 0))
         
         self.api_poll_interval = 30
         
@@ -76,8 +101,49 @@ class SpotifyDisplay:
             print(f"Failed to render text '{text}': {e}")
             # Optional: render a placeholder or just skip
 
+    def draw_world_clock(self):
+        """
+        Draws the world clock in the top right corner.
+        """
+        now_utc = datetime.now(pytz.utc)
+        
+        # Get Reference (Home) info
+        home_tz = pytz.timezone(next(c["tz"] for c in WORLD_CLOCKS if c["name"] == REFERENCE_LOCATION))
+        home_time = now_utc.astimezone(home_tz)
+        
+        # Get Current Cycle info
+        city = WORLD_CLOCKS[self.clock_index]
+        city_tz = pytz.timezone(city["tz"])
+        city_time = now_utc.astimezone(city_tz)
+        
+        # Format time: 10:42 and date: 05.15
+        time_str = city_time.strftime("%H:%M")
+        date_str = city_time.strftime("%m.%d")
+        
+        # Day offset logic
+        day_offset = ""
+        # Compare dates using the local dates of each timezone
+        if city_time.date() > home_time.date():
+            day_offset = " (+1)"
+        elif city_time.date() < home_time.date():
+            day_offset = " (-1)"
+            
+        prefix = "*" if city["name"] == REFERENCE_LOCATION else ""
+        # Format: *CITY: HH:MM | MM.DD (+1)
+        display_str = f"{prefix}{city['name'].upper()}: {time_str} | {date_str}{day_offset}".lower()
+        # Ensure city code is still uppercase
+        display_str = display_str.replace(city['name'].lower(), city['name'].upper())
+        
+        # Render
+        text_surf = self.font_medium.render(display_str, True, COLOR_TEXT_SUB)
+        rect = text_surf.get_rect(topright=(WINDOW_WIDTH - 50, 50))
+        self.screen.blit(text_surf, rect)
+
     def draw(self):
         self.screen.fill(COLOR_BG)
+        
+        # World Clock
+        self.draw_world_clock()
         
         if not self.track_info:
             text = "no music playing"
@@ -86,7 +152,7 @@ class SpotifyDisplay:
             self.screen.blit(text_surf, rect)
         else:
             # 1. Draw Album Art
-            art_x = 40
+            art_x = 50
             art_y = (WINDOW_HEIGHT - ALBUM_ART_SIZE) // 2
             if self.album_art:
                 self.screen.blit(self.album_art, (art_x, art_y))
@@ -94,9 +160,9 @@ class SpotifyDisplay:
                 pygame.draw.rect(self.screen, COLOR_PROGRESS_BG, (art_x, art_y, ALBUM_ART_SIZE, ALBUM_ART_SIZE))
             
             # 2. Draw Text Info (Bottom Aligned)
-            text_x = art_x + ALBUM_ART_SIZE + 40
+            text_x = art_x + ALBUM_ART_SIZE + 50
             bottom_y = art_y + ALBUM_ART_SIZE
-            max_text_width = WINDOW_WIDTH - text_x - 40
+            max_text_width = WINDOW_WIDTH - text_x - 50
             
             # Progress Bar (Lowest element)
             progress_ms = get_interpolated_progress(self.track_info, self.last_sync_time)
@@ -113,6 +179,8 @@ class SpotifyDisplay:
             
             # Time Text (under bar)
             time_str = self.format_time(progress_ms, duration_ms)
+            if not self.track_info['is_playing']:
+                time_str = f"[paused] {time_str}"
             
             # Debugging NULL pointer error
             if not isinstance(time_str, str) or not time_str:
@@ -137,6 +205,10 @@ class SpotifyDisplay:
             # Song Name (above artist)
             line_y -= 55
             self.render_lowercase_truncated(self.track_info['name'], self.font_large, COLOR_TEXT_MAIN, max_text_width, (text_x, line_y))
+
+        # Apply Dimming Overlay
+        if self.dimmed:
+            self.screen.blit(self.dim_surface, (0, 0))
 
         pygame.display.flip()
 
@@ -168,7 +240,17 @@ class SpotifyDisplay:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # Check if click is in the middle of the screen (central 400x400 area)
+                    center_rect = pygame.Rect(WINDOW_WIDTH//2 - 200, WINDOW_HEIGHT//2 - 200, 400, 400)
+                    if center_rect.collidepoint(event.pos):
+                        self.dimmed = not self.dimmed
             
+            # World Clock Cycling
+            if current_time - self.last_clock_cycle > CLOCK_CYCLE_INTERVAL:
+                self.clock_index = (self.clock_index + 1) % len(WORLD_CLOCKS)
+                self.last_clock_cycle = current_time
+
             # API Sync Logic
             should_sync = (current_time - self.last_sync_time > self.api_poll_interval)
             

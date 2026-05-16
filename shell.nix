@@ -9,6 +9,7 @@ pkgs.mkShell {
       python-pkgs.matplotlib
       python-pkgs.pygame
       python-pkgs.requests
+      python-pkgs.pytz
     ]))
   ];
 
