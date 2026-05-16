@@ -3,14 +3,15 @@ import time
 import requests
 import pygame
 import io
+import argparse
 from datetime import datetime
 import pytz
 from spotify import get_spotify_client, get_current_track_info, get_interpolated_progress
 
 # --- Constants ---
-WINDOW_WIDTH = 1024
-WINDOW_HEIGHT = 600
-ALBUM_ART_SIZE = 500
+
+DEFAULT_WINDOW_WIDTH = 1024
+DEFAULT_WINDOW_HEIGHT = 600
 FPS = 60
 
 # World Clock Config
@@ -23,7 +24,8 @@ WORLD_CLOCKS = [
     # {"name": "HKG", "tz": "Asia/Hong_Kong"},
     # {"name": "TYO", "tz": "Asia/Tokyo"},
 ]
-CLOCK_CYCLE_INTERVAL = 30 # Seconds per city
+HOME_CLOCK_CYCLE_INTERVAL = 30 # Seconds for the home city
+OTHER_CLOCK_CYCLE_INTERVAL = 15 # Seconds for every other city
 
 
 # Colors
@@ -37,15 +39,21 @@ COLOR_PROGRESS_BAR = (198, 160, 246)
 COLOR_PROGRESS_BG = (64, 64, 64)
 
 class SpotifyDisplay:
-    def __init__(self):
+    def __init__(self, width, height, allow_dimming=True):
         pygame.init()
-        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.width = width
+        self.height = height
+        self.album_art_size = height - 100
+        self.allow_dimming = allow_dimming
+
+        self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Spotify Widget")
         self.clock = pygame.time.Clock()
         
         # Simple, stable font loading with Arial
         self.font_large = pygame.font.SysFont("Arial", 36, bold=True)
         self.font_medium = pygame.font.SysFont("Arial", 28)
+        self.font_medium_bold = pygame.font.SysFont("Arial", 28, bold=True)
         self.font_small = pygame.font.SysFont("Arial", 20)
         
         # State
@@ -61,7 +69,7 @@ class SpotifyDisplay:
         
         # Dimming State
         self.dimmed = False
-        self.dim_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.dim_surface = pygame.Surface((self.width, self.height))
         self.dim_surface.set_alpha(180) # 0 is transparent, 255 is solid black
         self.dim_surface.fill((0, 0, 0))
         
@@ -75,7 +83,7 @@ class SpotifyDisplay:
             response = requests.get(url)
             image_data = io.BytesIO(response.content)
             raw_image = pygame.image.load(image_data)
-            self.album_art = pygame.transform.smoothscale(raw_image, (ALBUM_ART_SIZE, ALBUM_ART_SIZE))
+            self.album_art = pygame.transform.smoothscale(raw_image, (self.album_art_size, self.album_art_size))
             self.current_cover_url = url
         except Exception as e:
             print(f"Error loading album art: {e}")
@@ -135,8 +143,8 @@ class SpotifyDisplay:
         display_str = display_str.replace(city['name'].lower(), city['name'].upper())
         
         # Render
-        text_surf = self.font_medium.render(display_str, True, COLOR_TEXT_SUB)
-        rect = text_surf.get_rect(topright=(WINDOW_WIDTH - 50, 50))
+        text_surf = self.font_medium_bold.render(display_str, True, COLOR_TEXT_SUB)
+        rect = text_surf.get_rect(topright=(self.width - 50, 50))
         self.screen.blit(text_surf, rect)
 
     def draw(self):
@@ -148,21 +156,21 @@ class SpotifyDisplay:
         if not self.track_info:
             text = "no music playing"
             text_surf = self.font_medium.render(text, True, COLOR_TEXT_SUB)
-            rect = text_surf.get_rect(center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
+            rect = text_surf.get_rect(center=(self.width // 2, self.height // 2))
             self.screen.blit(text_surf, rect)
         else:
             # 1. Draw Album Art
             art_x = 50
-            art_y = (WINDOW_HEIGHT - ALBUM_ART_SIZE) // 2
+            art_y = (self.height - self.album_art_size) // 2
             if self.album_art:
                 self.screen.blit(self.album_art, (art_x, art_y))
             else:
-                pygame.draw.rect(self.screen, COLOR_PROGRESS_BG, (art_x, art_y, ALBUM_ART_SIZE, ALBUM_ART_SIZE))
+                pygame.draw.rect(self.screen, COLOR_PROGRESS_BG, (art_x, art_y, self.album_art_size, self.album_art_size))
             
             # 2. Draw Text Info (Bottom Aligned)
-            text_x = art_x + ALBUM_ART_SIZE + 50
-            bottom_y = art_y + ALBUM_ART_SIZE
-            max_text_width = WINDOW_WIDTH - text_x - 50
+            text_x = art_x + self.album_art_size + 50
+            bottom_y = art_y + self.album_art_size
+            max_text_width = self.width - text_x - 50
             
             # Progress Bar (Lowest element)
             progress_ms = get_interpolated_progress(self.track_info, self.last_sync_time)
@@ -240,14 +248,19 @@ class SpotifyDisplay:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Check if click is in the middle of the screen (central 400x400 area)
-                    center_rect = pygame.Rect(WINDOW_WIDTH//2 - 200, WINDOW_HEIGHT//2 - 200, 400, 400)
+                elif event.type == pygame.MOUSEBUTTONDOWN and self.allow_dimming:
+                    # Check if click is in the middle of the screen (10% margin on each side)
+                    zone_w = int(self.width * 0.8)
+                    zone_h = int(self.height * 0.8)
+                    center_rect = pygame.Rect(int(self.width * 0.1), int(self.height * 0.1), zone_w, zone_h)
                     if center_rect.collidepoint(event.pos):
                         self.dimmed = not self.dimmed
             
             # World Clock Cycling
-            if current_time - self.last_clock_cycle > CLOCK_CYCLE_INTERVAL:
+            current_city = WORLD_CLOCKS[self.clock_index]
+            interval = HOME_CLOCK_CYCLE_INTERVAL if current_city["name"] == REFERENCE_LOCATION else OTHER_CLOCK_CYCLE_INTERVAL
+            
+            if current_time - self.last_clock_cycle > interval:
                 self.clock_index = (self.clock_index + 1) % len(WORLD_CLOCKS)
                 self.last_clock_cycle = current_time
 
@@ -285,5 +298,13 @@ class SpotifyDisplay:
         pygame.quit()
 
 if __name__ == "__main__":
-    display = SpotifyDisplay()
+    parser = argparse.ArgumentParser(description="Spotify Display Widget")
+    parser.add_argument("--width", type=int, default=DEFAULT_WINDOW_WIDTH, help="Window width")
+    parser.add_argument("--height", type=int, default=DEFAULT_WINDOW_HEIGHT, help="Window height")
+    parser.add_argument("--no-dim", action="store_false", dest="allow_dimming", help="Disable click-to-dim feature")
+    parser.set_defaults(allow_dimming=True)
+    
+    args = parser.parse_args()
+    
+    display = SpotifyDisplay(args.width, args.height, args.allow_dimming)
     display.run()

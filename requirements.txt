@@ -1,0 +1,7 @@
+pygame
+requests
+pytz
+spotipy
+python-dotenv
+pandas
+matplotlib
