@@ -40,21 +40,26 @@ COLOR_PROGRESS_BG = (64, 64, 64)
 
 class SpotifyDisplay:
     def __init__(self, width, height, allow_dimming=True):
+        if width <= height:
+            print(f"Warning: Window width ({width}) should be greater than height ({height}) for optimal layout.")
+            
         pygame.init()
         self.width = width
         self.height = height
-        self.album_art_size = height - 100
+        self.margin = int(height * 0.08)
+        self.album_art_size = height - (2 * self.margin)
         self.allow_dimming = allow_dimming
 
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Spotify Widget")
         self.clock = pygame.time.Clock()
         
-        # Simple, stable font loading with Arial
-        self.font_large = pygame.font.SysFont("Arial", 36, bold=True)
-        self.font_medium = pygame.font.SysFont("Arial", 28)
-        self.font_medium_bold = pygame.font.SysFont("Arial", 28, bold=True)
-        self.font_small = pygame.font.SysFont("Arial", 20)
+        # Scalable font loading
+        base_size = height
+        self.font_large = pygame.font.SysFont("Arial", int(base_size * 0.06), bold=True)
+        self.font_medium = pygame.font.SysFont("Arial", int(base_size * 0.045))
+        self.font_medium_bold = pygame.font.SysFont("Arial", int(base_size * 0.045), bold=True)
+        self.font_small = pygame.font.SysFont("Arial", int(base_size * 0.03))
         
         # State
         self.sp = get_spotify_client()
@@ -124,9 +129,9 @@ class SpotifyDisplay:
         city_tz = pytz.timezone(city["tz"])
         city_time = now_utc.astimezone(city_tz)
         
-        # Format time: 10:42 and date: 05.15
-        time_str = city_time.strftime("%H:%M")
-        date_str = city_time.strftime("%m.%d")
+        # Format time: 10:42:05 and date: 15.05.26
+        time_str = city_time.strftime("%H:%M:%S")
+        date_str = city_time.strftime("%d.%m.%y")
         
         # Day offset logic
         day_offset = ""
@@ -144,8 +149,60 @@ class SpotifyDisplay:
         
         # Render
         text_surf = self.font_medium_bold.render(display_str, True, COLOR_TEXT_SUB)
-        rect = text_surf.get_rect(topright=(self.width - 50, 50))
+        rect = text_surf.get_rect(topright=(self.width - self.margin, self.margin))
         self.screen.blit(text_surf, rect)
+
+    def get_wrapped_text(self, text, font, max_width, max_lines=3):
+        """
+        Wraps text into multiple lines based on max_width.
+        Truncates the last line with ellipses if text exceeds max_lines.
+        """
+        text = str(text).lower()
+        words = text.split(' ')
+        lines = []
+        current_line = []
+
+        for i, word in enumerate(words):
+            # Check if adding this word exceeds max_width
+            test_line = ' '.join(current_line + [word])
+            
+            if font.size(test_line)[0] <= max_width:
+                current_line.append(word)
+            else:
+                # Need to start a new line
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                if len(lines) == max_lines - 1:
+                    # This was the second to last line, and we still have more words.
+                    # The current word + all remaining words must be fit/truncated on the LAST line.
+                    remaining_text = ' '.join(words[i:])
+                    last_line = remaining_text
+                    
+                    if font.size(last_line)[0] > max_width:
+                        # Truncate last line with ellipses
+                        for j in range(len(last_line), 0, -1):
+                            truncated = last_line[:j] + "..."
+                            if font.size(truncated)[0] <= max_width:
+                                last_line = truncated
+                                break
+                    lines.append(last_line)
+                    current_line = []
+                    break
+                else:
+                    current_line = [word]
+                    # Check if a single word is already too long for a fresh line
+                    if font.size(word)[0] > max_width:
+                        for j in range(len(word), 0, -1):
+                            truncated = word[:j] + "..."
+                            if font.size(truncated)[0] <= max_width:
+                                lines[-1] = truncated # This is slightly wrong, should be current line
+                                break
+        
+        if current_line and len(lines) < max_lines:
+            lines.append(' '.join(current_line))
+            
+        return lines
 
     def draw(self):
         self.screen.fill(COLOR_BG)
@@ -160,17 +217,17 @@ class SpotifyDisplay:
             self.screen.blit(text_surf, rect)
         else:
             # 1. Draw Album Art
-            art_x = 50
-            art_y = (self.height - self.album_art_size) // 2
+            art_x = self.margin
+            art_y = self.margin
             if self.album_art:
                 self.screen.blit(self.album_art, (art_x, art_y))
             else:
                 pygame.draw.rect(self.screen, COLOR_PROGRESS_BG, (art_x, art_y, self.album_art_size, self.album_art_size))
             
             # 2. Draw Text Info (Bottom Aligned)
-            text_x = art_x + self.album_art_size + 50
+            text_x = art_x + self.album_art_size + self.margin
             bottom_y = art_y + self.album_art_size
-            max_text_width = self.width - text_x - 50
+            max_text_width = self.width - text_x - self.margin
             
             # Progress Bar (Lowest element)
             progress_ms = get_interpolated_progress(self.track_info, self.last_sync_time)
@@ -179,7 +236,7 @@ class SpotifyDisplay:
             
             bar_width = max_text_width
             bar_height = 8
-            bar_y = bottom_y - 30
+            bar_y = bottom_y - int(self.margin * 0.6)
             
             # Draw Progress Bar
             pygame.draw.rect(self.screen, COLOR_PROGRESS_BG, (text_x, bar_y, bar_width, bar_height), border_radius=4)
@@ -201,18 +258,22 @@ class SpotifyDisplay:
                 print(f"Failed to render time: {e}")
 
             # Text spacing logic
-            line_y = bar_y - 50 # Start 50px above bar
+            line_y = bar_y - self.margin
             
             # Album (above bar)
             self.render_lowercase_truncated(self.track_info['album'], self.font_small, COLOR_TEXT_SUB, max_text_width, (text_x, line_y))
             
             # Artist (above album)
-            line_y -= 45
+            line_y -= int(self.margin * 0.9)
             self.render_lowercase_truncated(self.track_info['artist'], self.font_medium, COLOR_TEXT_SUB, max_text_width, (text_x, line_y))
             
-            # Song Name (above artist)
-            line_y -= 55
-            self.render_lowercase_truncated(self.track_info['name'], self.font_large, COLOR_TEXT_MAIN, max_text_width, (text_x, line_y))
+            # Song Name (above artist) - Multi-line
+            wrapped_name = self.get_wrapped_text(self.track_info['name'], self.font_large, max_text_width, max_lines=3)
+            
+            # Draw lines from bottom to top
+            for line in reversed(wrapped_name):
+                line_y -= int(self.margin * 1.1)
+                self.render_lowercase_truncated(line, self.font_large, COLOR_TEXT_MAIN, max_text_width, (text_x, line_y))
 
         # Apply Dimming Overlay
         if self.dimmed:
