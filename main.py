@@ -21,8 +21,8 @@ WORLD_CLOCKS = [
     {"name": "AUS", "tz": "America/Chicago"},
     {"name": "PIT", "tz": "America/New_York"},
     # {"name": "LON", "tz": "Europe/London"},
-    # {"name": "HKG", "tz": "Asia/Hong_Kong"},
-    # {"name": "TYO", "tz": "Asia/Tokyo"},
+    {"name": "HKG", "tz": "Asia/Hong_Kong"},
+    {"name": "TYO", "tz": "Asia/Tokyo"},
 ]
 HOME_CLOCK_CYCLE_INTERVAL = 30 # Seconds for the home city
 OTHER_CLOCK_CYCLE_INTERVAL = 15 # Seconds for every other city
