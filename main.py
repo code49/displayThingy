@@ -12,7 +12,7 @@ from spotify import get_spotify_client, get_current_track_info, get_interpolated
 
 DEFAULT_WINDOW_WIDTH = 1024
 DEFAULT_WINDOW_HEIGHT = 600
-FPS = 60
+DEFAULT_FPS = 60
 
 # World Clock Config
 REFERENCE_LOCATION = "AUS" # Our "Home" location
@@ -39,7 +39,7 @@ COLOR_PROGRESS_BAR = (198, 160, 246)
 COLOR_PROGRESS_BG = (64, 64, 64)
 
 class SpotifyDisplay:
-    def __init__(self, width, height, allow_dimming=True, fullscreen=False):
+    def __init__(self, width, height, allow_dimming=True, fullscreen=False, fps=DEFAULT_FPS):
         pygame.init()
         
         if fullscreen:
@@ -58,6 +58,7 @@ class SpotifyDisplay:
         self.margin = int(self.height * 0.08)
         self.album_art_size = self.height - (2 * self.margin)
         self.allow_dimming = allow_dimming
+        self.fps = fps
 
         self.screen = pygame.display.set_mode((self.width, self.height), flags)
         pygame.display.set_caption("Spotify Widget")
@@ -205,7 +206,7 @@ class SpotifyDisplay:
                         for j in range(len(word), 0, -1):
                             truncated = word[:j] + "..."
                             if font.size(truncated)[0] <= max_width:
-                                lines[-1] = truncated # This is slightly wrong, should be current line
+                                current_line = [truncated]
                                 break
         
         if current_line and len(lines) < max_lines:
@@ -277,7 +278,7 @@ class SpotifyDisplay:
             self.render_lowercase_truncated(self.track_info['artist'], self.font_medium, COLOR_TEXT_SUB, max_text_width, (text_x, line_y))
             
             # Song Name (above artist) - Multi-line
-            wrapped_name = self.get_wrapped_text(self.track_info['name'], self.font_large, max_text_width, max_lines=3)
+            wrapped_name = self.get_wrapped_text(self.track_info['name'], self.font_large, max_text_width, max_lines=2)
             
             # Draw lines from bottom to top
             for line in reversed(wrapped_name):
@@ -366,7 +367,7 @@ class SpotifyDisplay:
                     self.last_sync_time = current_time # Still update sync time to respect interval
             
             self.draw()
-            self.clock.tick(FPS)
+            self.clock.tick(self.fps)
             
         pygame.quit()
 
@@ -374,11 +375,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Spotify Display Widget")
     parser.add_argument("--width", type=int, default=DEFAULT_WINDOW_WIDTH, help="Window width")
     parser.add_argument("--height", type=int, default=DEFAULT_WINDOW_HEIGHT, help="Window height")
+    parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Target frames per second")
     parser.add_argument("--no-dim", action="store_false", dest="allow_dimming", help="Disable click-to-dim feature")
     parser.add_argument("--fullscreen", action="store_true", help="Run the display in fullscreen mode")
     parser.set_defaults(allow_dimming=True)
     
     args = parser.parse_args()
     
-    display = SpotifyDisplay(args.width, args.height, args.allow_dimming, args.fullscreen)
+    display = SpotifyDisplay(args.width, args.height, args.allow_dimming, args.fullscreen, args.fps)
     display.run()
