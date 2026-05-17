@@ -39,23 +39,32 @@ COLOR_PROGRESS_BAR = (198, 160, 246)
 COLOR_PROGRESS_BG = (64, 64, 64)
 
 class SpotifyDisplay:
-    def __init__(self, width, height, allow_dimming=True):
-        if width <= height:
-            print(f"Warning: Window width ({width}) should be greater than height ({height}) for optimal layout.")
-            
+    def __init__(self, width, height, allow_dimming=True, fullscreen=False):
         pygame.init()
-        self.width = width
-        self.height = height
-        self.margin = int(height * 0.08)
-        self.album_art_size = height - (2 * self.margin)
+        
+        if fullscreen:
+            info = pygame.display.Info()
+            self.width = info.current_w
+            self.height = info.current_h
+            flags = pygame.FULLSCREEN | pygame.NOFRAME
+        else:
+            self.width = width
+            self.height = height
+            flags = 0
+
+        if self.width <= self.height:
+            print(f"Warning: Window width ({self.width}) should be greater than height ({self.height}) for optimal layout.")
+            
+        self.margin = int(self.height * 0.08)
+        self.album_art_size = self.height - (2 * self.margin)
         self.allow_dimming = allow_dimming
 
-        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.screen = pygame.display.set_mode((self.width, self.height), flags)
         pygame.display.set_caption("Spotify Widget")
         self.clock = pygame.time.Clock()
         
         # Scalable font loading
-        base_size = height
+        base_size = self.height
         self.font_large = pygame.font.SysFont("Arial", int(base_size * 0.06), bold=True)
         self.font_medium = pygame.font.SysFont("Arial", int(base_size * 0.045))
         self.font_medium_bold = pygame.font.SysFont("Arial", int(base_size * 0.045), bold=True)
@@ -309,6 +318,9 @@ class SpotifyDisplay:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and self.allow_dimming:
                     # Check if click is in the middle of the screen (10% margin on each side)
                     zone_w = int(self.width * 0.8)
@@ -363,9 +375,10 @@ if __name__ == "__main__":
     parser.add_argument("--width", type=int, default=DEFAULT_WINDOW_WIDTH, help="Window width")
     parser.add_argument("--height", type=int, default=DEFAULT_WINDOW_HEIGHT, help="Window height")
     parser.add_argument("--no-dim", action="store_false", dest="allow_dimming", help="Disable click-to-dim feature")
+    parser.add_argument("--fullscreen", action="store_true", help="Run the display in fullscreen mode")
     parser.set_defaults(allow_dimming=True)
     
     args = parser.parse_args()
     
-    display = SpotifyDisplay(args.width, args.height, args.allow_dimming)
+    display = SpotifyDisplay(args.width, args.height, args.allow_dimming, args.fullscreen)
     display.run()
