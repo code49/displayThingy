@@ -161,7 +161,7 @@ class SpotifyDisplay:
         rect = text_surf.get_rect(topright=(self.width - self.margin, self.margin))
         self.screen.blit(text_surf, rect)
 
-    def get_wrapped_text(self, text, font, max_width, max_lines=3):
+    def get_wrapped_text(self, text, font, max_width, max_lines=2):
         """
         Wraps text into multiple lines based on max_width.
         Truncates the last line with ellipses if text exceeds max_lines.
