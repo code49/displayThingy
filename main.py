@@ -39,7 +39,7 @@ COLOR_PROGRESS_BAR = (198, 160, 246)
 COLOR_PROGRESS_BG = (64, 64, 64)
 
 class SpotifyDisplay:
-    def __init__(self, width, height, allow_dimming=True, fullscreen=False, fps=DEFAULT_FPS):
+    def __init__(self, width, height, allow_dimming=True, fullscreen=False, fps=DEFAULT_FPS, debug=False):
         pygame.init()
         
         if fullscreen:
@@ -59,6 +59,7 @@ class SpotifyDisplay:
         self.album_art_size = self.height - (2 * self.margin)
         self.allow_dimming = allow_dimming
         self.fps = fps
+        self.debug = debug
 
         self.screen = pygame.display.set_mode((self.width, self.height), flags)
         pygame.display.set_caption("Spotify Widget")
@@ -270,13 +271,13 @@ class SpotifyDisplay:
             # Text spacing logic
             line_y = bar_y - self.margin
             
-            # Album (above bar)
+            # Album / Show Name (above bar)
             self.render_lowercase_truncated(self.track_info['album'], self.font_small, COLOR_TEXT_SUB, max_text_width, (text_x, line_y))
             
-            # Artist (above album)
+            # Artist / Publisher (above album)
             line_y -= int(self.margin * 0.9)
             self.render_lowercase_truncated(self.track_info['artist'], self.font_medium, COLOR_TEXT_SUB, max_text_width, (text_x, line_y))
-            
+
             # Song Name (above artist) - Multi-line
             wrapped_name = self.get_wrapped_text(self.track_info['name'], self.font_large, max_text_width, max_lines=2)
             
@@ -284,6 +285,11 @@ class SpotifyDisplay:
             for line in reversed(wrapped_name):
                 line_y -= int(self.margin * 1.1)
                 self.render_lowercase_truncated(line, self.font_large, COLOR_TEXT_MAIN, max_text_width, (text_x, line_y))
+
+            # Type indicator (Podcast vs Track) - Above the Name
+            if self.track_info.get('type') == 'podcast':
+                type_surf = self.font_small.render("[PODCAST]", True, COLOR_PROGRESS_BAR)
+                self.screen.blit(type_surf, (text_x, line_y - int(self.margin * 0.6)))
 
         # Apply Dimming Overlay
         if self.dimmed:
@@ -351,7 +357,7 @@ class SpotifyDisplay:
                         should_sync = True
 
             if should_sync:
-                new_info = get_current_track_info(self.sp)
+                new_info = get_current_track_info(self.sp, debug=self.debug)
                 if new_info:
                     # Check if the song actually changed or if progress reset
                     # This helps debug/log transitions
@@ -378,9 +384,10 @@ if __name__ == "__main__":
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Target frames per second")
     parser.add_argument("--no-dim", action="store_false", dest="allow_dimming", help="Disable click-to-dim feature")
     parser.add_argument("--fullscreen", action="store_true", help="Run the display in fullscreen mode")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.set_defaults(allow_dimming=True)
     
     args = parser.parse_args()
     
-    display = SpotifyDisplay(args.width, args.height, args.allow_dimming, args.fullscreen, args.fps)
+    display = SpotifyDisplay(args.width, args.height, args.allow_dimming, args.fullscreen, args.fps, args.debug)
     display.run()
