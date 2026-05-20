@@ -90,6 +90,7 @@ class SpotifyDisplay:
         self.dim_surface.fill((0, 0, 0))
         
         self.api_poll_interval = 30
+        self.error_message = None
         
     def fetch_album_art(self, url):
         if url == self.current_cover_url and self.album_art:
@@ -226,6 +227,17 @@ class SpotifyDisplay:
             text_surf = self.font_medium.render(text, True, COLOR_TEXT_SUB)
             rect = text_surf.get_rect(center=(self.width // 2, self.height // 2))
             self.screen.blit(text_surf, rect)
+            
+            if self.error_message:
+                error_text = f"warning: {self.error_message}"
+                wrapped_error = self.get_wrapped_text(error_text, self.font_small, self.width * 0.8, max_lines=2)
+                
+                error_y = rect.bottom + 20
+                for line in wrapped_error:
+                    line_surf = self.font_small.render(line, True, (200, 80, 80)) # Reddish
+                    line_rect = line_surf.get_rect(midtop=(self.width // 2, error_y))
+                    self.screen.blit(line_surf, line_rect)
+                    error_y += line_surf.get_height() + 5
         else:
             # 1. Draw Album Art
             art_x = self.margin
@@ -316,7 +328,7 @@ class SpotifyDisplay:
         show_hours = duration_ms >= 3600000
         return f"{to_str(current_ms, show_hours)} / {to_str(duration_ms, show_hours)}"
 
-    def run(self):
+    def run(self, test_error=False):
         running = True
         while running:
             current_time = time.time()
@@ -357,19 +369,30 @@ class SpotifyDisplay:
                         should_sync = True
 
             if should_sync:
-                new_info = get_current_track_info(self.sp, debug=self.debug)
+                if test_error:
+                    new_info = {"error": "Simulated API Error for testing"}
+                else:
+                    new_info = get_current_track_info(self.sp, debug=self.debug)
+                
                 if new_info:
-                    # Check if the song actually changed or if progress reset
-                    # This helps debug/log transitions
-                    if not self.track_info or new_info['name'] != self.track_info['name']:
-                        print(f"Song transition detected: {new_info['name']}")
-                        
-                    self.track_info = new_info
+                    if "error" in new_info:
+                        self.error_message = new_info["error"]
+                        self.track_info = None
+                    else:
+                        self.error_message = None
+                        # Check if the song actually changed or if progress reset
+                        # This helps debug/log transitions
+                        if not self.track_info or new_info['name'] != self.track_info['name']:
+                            print(f"Song transition detected: {new_info['name']}")
+                            
+                        self.track_info = new_info
+                        if self.track_info['cover_url']:
+                            self.fetch_album_art(self.track_info['cover_url'])
+                    
                     self.last_sync_time = current_time
-                    if self.track_info['cover_url']:
-                        self.fetch_album_art(self.track_info['cover_url'])
                 else:
                     self.track_info = None
+                    self.error_message = None
                     self.last_sync_time = current_time # Still update sync time to respect interval
             
             self.draw()
@@ -385,9 +408,10 @@ if __name__ == "__main__":
     parser.add_argument("--no-dim", action="store_false", dest="allow_dimming", help="Disable click-to-dim feature")
     parser.add_argument("--fullscreen", action="store_true", help="Run the display in fullscreen mode")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--test-error", action="store_true", help="Simulate a Spotify API error for testing")
     parser.set_defaults(allow_dimming=True)
     
     args = parser.parse_args()
     
     display = SpotifyDisplay(args.width, args.height, args.allow_dimming, args.fullscreen, args.fps, args.debug)
-    display.run()
+    display.run(test_error=args.test_error)

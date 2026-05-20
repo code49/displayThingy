@@ -17,10 +17,11 @@ def get_spotify_client():
         redirect_uri=os.getenv('SPOTIPY_REDIRECT_URI'),
         scope=scope,
         cache_path=".spotify_cache",
-        open_browser=True
+        open_browser=True,
+        requests_timeout=10
     )
     
-    return spotipy.Spotify(auth_manager=auth_manager)
+    return spotipy.Spotify(auth_manager=auth_manager, requests_timeout=10)
 
 def get_current_track_info(sp, debug=False):
     """
@@ -112,7 +113,7 @@ def get_current_track_info(sp, debug=False):
         return track_info
     except Exception as e:
         print(f"Error fetching Spotify data: {e}")
-        return None
+        return {"error": str(e)}
 
 import time
 
