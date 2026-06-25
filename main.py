@@ -12,39 +12,60 @@ DEFAULT_WINDOW_HEIGHT = 600
 DEFAULT_FPS = 60
 
 class SpotifyDisplay:
-    def __init__(self, width=None, height=None, allow_dimming=None, fullscreen=None, fps=None, show_clock=None, show_weather=None, debug=False, config_path="configs.json"):
+    def __init__(self, width=None, height=None, allow_dimming=None, fullscreen=None, fps=None, profile=None, show_clock=None, show_weather=None, debug=False, config_path="configs.json"):
         # 1. Load config
         self.config = self.load_config(config_path)
         self.debug = debug
 
-        # Merge config settings with arguments
-        self.window_cfg = self.config.setdefault("window", {})
-        
-        # Merge show_clock
-        if show_clock is not None:
-            self.config["show_clock"] = show_clock
-        else:
-            self.config.setdefault("show_clock", True)
+        # Resolve active profile configuration
+        self.profile_name = profile if profile is not None else self.config.get("active_profile", "default")
+        profile_cfg = self.config.get("profiles", {}).get(self.profile_name, {})
+        if not profile_cfg and self.profile_name != "default":
+            print(f"Warning: Profile '{self.profile_name}' not found. Falling back to default.")
+            profile_cfg = self.config.get("profiles", {}).get("default", {})
+            self.profile_name = "default"
 
-        # Merge show_weather
-        if show_weather is not None:
-            self.config["show_weather"] = show_weather
-        else:
-            self.config.setdefault("show_weather", False)
+        # Load window configuration from profile
+        window_cfg = profile_cfg.get("window", {})
         
-        self.width = width if width is not None else self.window_cfg.get("width", DEFAULT_WINDOW_WIDTH)
-        self.height = height if height is not None else self.window_cfg.get("height", DEFAULT_WINDOW_HEIGHT)
-        self.fps = fps if fps is not None else self.window_cfg.get("fps", DEFAULT_FPS)
-        self.fullscreen = fullscreen if fullscreen is not None else self.window_cfg.get("fullscreen", False)
+        # Merge CLI arguments with profile/config window settings
+        self.width = width if width is not None else window_cfg.get("width", DEFAULT_WINDOW_WIDTH)
+        self.height = height if height is not None else window_cfg.get("height", DEFAULT_WINDOW_HEIGHT)
+        self.fps = fps if fps is not None else window_cfg.get("fps", DEFAULT_FPS)
+        self.fullscreen = fullscreen if fullscreen is not None else window_cfg.get("fullscreen", False)
         
-        if allow_dimming is not None:
-            self.window_cfg["allow_dimming"] = allow_dimming
-            
-        # Update config dict to match runtime variables
+        # Build window configuration dictionary for the runtime config
+        self.window_cfg = self.config.setdefault("window", {})
         self.window_cfg["width"] = self.width
         self.window_cfg["height"] = self.height
         self.window_cfg["fps"] = self.fps
         self.window_cfg["fullscreen"] = self.fullscreen
+        
+        actual_allow_dimming = allow_dimming if allow_dimming is not None else window_cfg.get("allow_dimming", True)
+        self.window_cfg["allow_dimming"] = actual_allow_dimming
+        
+        # Resolve active view name
+        active_view_name = profile_cfg.get("active_view", "spotify_clock")
+        
+        # Translate old command line boolean flags for backwards compatibility if explicitly set
+        if show_clock is not None or show_weather is not None:
+            has_clock = "clock" in active_view_name
+            has_weather = "weather" in active_view_name
+            
+            final_clock = show_clock if show_clock is not None else has_clock
+            final_weather = show_weather if show_weather is not None else has_weather
+            
+            if final_clock and final_weather:
+                active_view_name = "spotify_clock_weather"
+            elif final_clock:
+                active_view_name = "spotify_clock"
+            elif final_weather:
+                active_view_name = "spotify_weather"
+            else:
+                active_view_name = "spotify"
+                
+        # Store resolved view name back in configs
+        self.config["active_view"] = active_view_name
         
         pygame.init()
         
@@ -64,10 +85,9 @@ class SpotifyDisplay:
         self.clock = pygame.time.Clock()
         
         # Load and instantiate active view
-        view_name = self.config.get("active_view", "spotify_clock")
-        view_cls = get_view_class(view_name)
+        view_cls = get_view_class(active_view_name)
         if not view_cls:
-            raise ValueError(f"Unknown view: {view_name}")
+            raise ValueError(f"Unknown view: {active_view_name}")
             
         self.view = view_cls(self.config, self.width, self.height, debug=self.debug)
 
@@ -153,6 +173,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-clock", dest="show_clock", action="store_false", default=None, help="Hide world clock")
     parser.add_argument("--show-weather", dest="show_weather", action="store_true", default=None, help="Show weather report")
     parser.add_argument("--no-weather", dest="show_weather", action="store_false", default=None, help="Hide weather report")
+    parser.add_argument("--profile", "-p", type=str, help="Configuration profile to run (e.g. raspi, framework13)")
     
     args = parser.parse_args()
     
@@ -163,6 +184,7 @@ if __name__ == "__main__":
         allow_dimming=None if args.allow_dimming else False,
         fullscreen=True if args.fullscreen else None,
         fps=args.fps,
+        profile=args.profile,
         show_clock=args.show_clock,
         show_weather=args.show_weather,
         debug=args.debug

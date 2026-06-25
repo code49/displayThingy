@@ -1,14 +1,37 @@
 {
-  "window": {
-    "width": 1024,
-    "height": 600,
-    "fps": 60,
-    "fullscreen": false,
-    "allow_dimming": true
+  "active_profile": "default",
+  "profiles": {
+    "default": {
+      "window": {
+        "width": 1024,
+        "height": 600,
+        "fps": 60,
+        "fullscreen": false,
+        "allow_dimming": true
+      },
+      "active_view": "spotify_clock"
+    },
+    "raspi": {
+      "window": {
+        "width": 1280,
+        "height": 720,
+        "fps": 60,
+        "fullscreen": false,
+        "allow_dimming": true
+      },
+      "active_view": "spotify_clock_weather"
+    },
+    "framework13": {
+      "window": {
+        "width": 2880,
+        "height": 1920,
+        "fps": 60,
+        "fullscreen": false,
+        "allow_dimming": true
+      },
+      "active_view": "spotify_clock_weather"
+    }
   },
-  "active_view": "spotify_clock",
-  "show_clock": true,
-  "show_weather": false,
   "widgets": {
     "world_clock": {
       "reference_location": "AUS",
