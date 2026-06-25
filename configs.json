@@ -16,7 +16,7 @@
         "width": 1024,
         "height": 600,
         "fps": 60,
-        "fullscreen": false,
+        "fullscreen": true,
         "allow_dimming": true
       },
       "active_view": "spotify_clock_weather"
