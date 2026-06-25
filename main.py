@@ -7,8 +7,8 @@ from views import get_view_class
 from widgets.spotify import get_current_track_info
 
 # --- Default Constants (Fallback if configs.json is missing) ---
-DEFAULT_WINDOW_WIDTH = 1024
-DEFAULT_WINDOW_HEIGHT = 600
+DEFAULT_WINDOW_WIDTH = 1280
+DEFAULT_WINDOW_HEIGHT = 720
 DEFAULT_FPS = 60
 
 class SpotifyDisplay:

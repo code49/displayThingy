@@ -3,18 +3,18 @@
   "profiles": {
     "default": {
       "window": {
-        "width": 1024,
-        "height": 600,
+        "width": 1280,
+        "height": 720,
         "fps": 60,
         "fullscreen": false,
         "allow_dimming": true
       },
-      "active_view": "spotify_clock"
+      "active_view": "spotify_clock_weather"
     },
     "raspi": {
       "window": {
-        "width": 1280,
-        "height": 720,
+        "width": 1024,
+        "height": 600,
         "fps": 60,
         "fullscreen": false,
         "allow_dimming": true
