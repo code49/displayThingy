@@ -3,6 +3,7 @@ import io
 import time
 import requests
 import pygame
+import re
 from dotenv import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -26,6 +27,37 @@ def get_spotify_client():
     )
     
     return spotipy.Spotify(auth_manager=auth_manager, requests_timeout=10)
+
+def clean_track_name(name):
+    """
+    Cleans song titles by removing common extra text (such as "feat. ...",
+    "with ...", "Remastered", "Radio Edit", "Live", etc.).
+    """
+    if not name:
+        return name
+    
+    keywords = [
+        r'feat\.?', r'featuring', r'with', r'remaster(ed)?', r'live', r'acoustic', 
+        r'radio\s+edit', r'edit', r'bonus', r'single', r'deluxe', r'extended', 
+        r'original\s+mix', r'mix', r'version', r'instrumental', r'edition', r'mono', r'stereo'
+    ]
+    
+    keywords_pattern = '|'.join(keywords)
+    paren_regex = re.compile(
+        r'\s*[\(\[][^\]\)]*(?:' + keywords_pattern + r')[^\]\)]*[\)\]]',
+        re.IGNORECASE
+    )
+    
+    hyphen_regex = re.compile(
+        r'\s*-\s*.*?(?:' + keywords_pattern + r').*',
+        re.IGNORECASE
+    )
+    
+    cleaned = name
+    cleaned = hyphen_regex.sub('', cleaned)
+    cleaned = paren_regex.sub('', cleaned)
+    cleaned = cleaned.strip()
+    return cleaned if cleaned else name
 
 def get_current_track_info(sp, debug=False):
     """
@@ -104,7 +136,7 @@ def get_current_track_info(sp, debug=False):
             # Music Track
             album = item.get('album', {})
             track_info = {
-                'name': item.get('name', 'Unknown Track'),
+                'name': clean_track_name(item.get('name', 'Unknown Track')),
                 'artist': ", ".join([artist['name'] for artist in item.get('artists', [])]) or "Unknown Artist",
                 'album': album.get('name', 'Unknown Album'),
                 'cover_url': album.get('images', [{}])[0].get('url') if album.get('images') else None,
