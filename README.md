@@ -34,8 +34,7 @@ displayThingy/
 │   ├── weather/
 │   │   └── weather.py          # Periodic, async weather fetcher using wttr.in JSON API
 │   └── spotify/
-│       ├── spotify.py          # Spotify API fetch, authentication & interpolation
-│       └── spotify-playlist.py # Standalone playlist analyzer (visualizes top artists)
+│       └── spotify.py          # Spotify API fetch, authentication & interpolation
 └── views/                      # Presentation layer defining layouts
     ├── base_view.py            # Abstract BaseView layout
     ├── spotify_base_view.py    # Common layout for drawing Spotify interfaces
