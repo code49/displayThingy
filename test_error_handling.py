@@ -65,5 +65,30 @@ class TestErrorHandling(unittest.TestCase):
         # Should NOT have called real get_current_track_info
         mock_get_info.assert_not_called()
 
+    @patch('widgets.spotify.spotify.os.path.exists')
+    @patch('widgets.spotify.spotify.os.remove')
+    def test_invalid_grant_removes_cache(self, mock_remove, mock_exists):
+        from widgets.spotify.spotify import get_current_track_info
+        
+        # Setup mock spotipy client
+        mock_sp = MagicMock()
+        mock_sp.current_playback.side_effect = Exception("invalid_grant: refresh token expired")
+        
+        # Setup mock cache handler with path
+        mock_handler = MagicMock()
+        mock_handler.cache_path = "/path/to/mock_cache"
+        mock_sp.auth_manager.cache_handler = mock_handler
+        
+        mock_exists.return_value = True
+        
+        # Run get_current_track_info
+        res = get_current_track_info(mock_sp)
+        
+        # Assertions
+        mock_exists.assert_called_once_with("/path/to/mock_cache")
+        mock_remove.assert_called_once_with("/path/to/mock_cache")
+        self.assertIn("error", res)
+        self.assertIn("invalid_grant", res["error"])
+
 if __name__ == '__main__':
     unittest.main()

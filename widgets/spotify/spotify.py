@@ -149,6 +149,23 @@ def get_current_track_info(sp, debug=False):
         return track_info
     except Exception as e:
         print(f"Error fetching Spotify data: {e}")
+        err_str = str(e).lower()
+        if "invalid_grant" in err_str:
+            try:
+                cache_path = None
+                if hasattr(sp, 'auth_manager') and hasattr(sp.auth_manager, 'cache_handler'):
+                    handler = sp.auth_manager.cache_handler
+                    if hasattr(handler, 'cache_path'):
+                        cache_path = handler.cache_path
+                
+                if not cache_path:
+                    cache_path = ".spotify_cache"
+                
+                if cache_path and os.path.exists(cache_path):
+                    os.remove(cache_path)
+                    print(f"Discarded expired token cache at {cache_path} due to invalid_grant.")
+            except Exception as cache_err:
+                print(f"Failed to clear cache: {cache_err}")
         return {"error": str(e)}
 
 def get_interpolated_progress(track_info, last_sync_time):
