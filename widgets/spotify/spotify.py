@@ -1,4 +1,8 @@
 import os
+import io
+import time
+import requests
+import pygame
 from dotenv import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -115,8 +119,6 @@ def get_current_track_info(sp, debug=False):
         print(f"Error fetching Spotify data: {e}")
         return {"error": str(e)}
 
-import time
-
 def get_interpolated_progress(track_info, last_sync_time):
     """
     Calculates the estimated current progress in ms based on elapsed time 
@@ -133,3 +135,76 @@ def get_interpolated_progress(track_info, last_sync_time):
     
     # Cap at song duration
     return min(interpolated_ms, track_info['duration_ms'])
+
+
+class SpotifyWidget:
+    def __init__(self, api_poll_interval=30, debug=False):
+        self.api_poll_interval = api_poll_interval
+        self.debug = debug
+        self.sp = get_spotify_client()
+        self.track_info = None
+        self.last_sync_time = 0
+        self.error_message = None
+        
+        # Album Art Cache
+        self.album_art = None
+        self.current_cover_url = None
+
+    def fetch_album_art(self, url, size):
+        if url == self.current_cover_url and self.album_art:
+            return self.album_art
+            
+        try:
+            response = requests.get(url)
+            image_data = io.BytesIO(response.content)
+            raw_image = pygame.image.load(image_data)
+            self.album_art = pygame.transform.smoothscale(raw_image, (size, size))
+            self.current_cover_url = url
+            return self.album_art
+        except Exception as e:
+            print(f"Error loading album art: {e}")
+            self.album_art = None
+            return None
+
+    def update(self, current_time=None, album_art_size=None, test_error=False):
+        if current_time is None:
+            current_time = time.time()
+            
+        should_sync = (current_time - self.last_sync_time > self.api_poll_interval)
+        
+        # Smart Sync: If song is playing and should have finished (plus 1s buffer)
+        if self.track_info and self.track_info['is_playing']:
+            progress_ms = get_interpolated_progress(self.track_info, self.last_sync_time)
+            if progress_ms >= self.track_info['duration_ms']:
+                # Poll again if we haven't checked in at least 2 seconds
+                if current_time - self.last_sync_time > 2:
+                    should_sync = True
+
+        if should_sync:
+            if test_error:
+                new_info = {"error": "Simulated API Error for testing"}
+            else:
+                new_info = get_current_track_info(self.sp, debug=self.debug)
+            
+            if new_info:
+                if "error" in new_info:
+                    self.error_message = new_info["error"]
+                    self.track_info = None
+                else:
+                    self.error_message = None
+                    if not self.track_info or new_info['name'] != self.track_info['name']:
+                        print(f"Song transition detected: {new_info['name']}")
+                        
+                    self.track_info = new_info
+                    if self.track_info['cover_url'] and album_art_size:
+                        self.fetch_album_art(self.track_info['cover_url'], album_art_size)
+                
+                self.last_sync_time = current_time
+            else:
+                self.track_info = None
+                self.error_message = None
+                self.last_sync_time = current_time # Still update to respect interval
+                
+        # If track info is present and art size is specified, ensure it is loaded
+        if self.track_info and self.track_info['cover_url'] and album_art_size and not self.album_art:
+            self.fetch_album_art(self.track_info['cover_url'], album_art_size)

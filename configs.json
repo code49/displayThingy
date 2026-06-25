@@ -1,0 +1,27 @@
+{
+  "window": {
+    "width": 1024,
+    "height": 600,
+    "fps": 60,
+    "fullscreen": false,
+    "allow_dimming": true
+  },
+  "active_view": "spotify_clock",
+  "widgets": {
+    "world_clock": {
+      "reference_location": "AUS",
+      "clocks": [
+        {"name": "SFO", "tz": "America/Los_Angeles"},
+        {"name": "AUS", "tz": "America/Chicago"},
+        {"name": "PIT", "tz": "America/New_York"},
+        {"name": "HKG", "tz": "Asia/Hong_Kong"},
+        {"name": "TYO", "tz": "Asia/Tokyo"}
+      ],
+      "home_cycle_interval": 30,
+      "other_cycle_interval": 15
+    },
+    "spotify": {
+      "api_poll_interval": 30
+    }
+  }
+}
