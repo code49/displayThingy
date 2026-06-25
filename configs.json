@@ -7,6 +7,8 @@
     "allow_dimming": true
   },
   "active_view": "spotify_clock",
+  "show_clock": true,
+  "show_weather": false,
   "widgets": {
     "world_clock": {
       "reference_location": "AUS",

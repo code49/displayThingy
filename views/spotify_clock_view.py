@@ -1,6 +1,6 @@
 import pygame
 from .base_view import BaseView
-from widgets import WorldClockWidget, SpotifyWidget
+from widgets import WorldClockWidget, SpotifyWidget, WeatherWidget
 from widgets.spotify import get_interpolated_progress
 
 # --- Colors ---
@@ -30,12 +30,18 @@ class SpotifyClockView(BaseView):
         
         # Initialize widgets using configuration
         clock_cfg = config["widgets"]["world_clock"]
+        self.show_clock = config.get("show_clock", True)
+        self.show_weather = config.get("show_weather", False)
+        
         self.world_clock_widget = WorldClockWidget(
             reference_location=clock_cfg["reference_location"],
             clocks=clock_cfg["clocks"],
             home_cycle_interval=clock_cfg["home_cycle_interval"],
             other_cycle_interval=clock_cfg["other_cycle_interval"]
         )
+        
+        cities = [c["name"] for c in clock_cfg["clocks"]]
+        self.weather_widget = WeatherWidget(cities=cities, api_poll_interval=300)
         
         spotify_cfg = config["widgets"]["spotify"]
         self.spotify_widget = SpotifyWidget(
@@ -64,6 +70,8 @@ class SpotifyClockView(BaseView):
                     
         # Update widgets
         self.world_clock_widget.update(current_time)
+        if self.show_weather:
+            self.weather_widget.update(current_time)
         self.spotify_widget.update(current_time, album_art_size=self.album_art_size, test_error=test_error)
 
     def render_lowercase_truncated(self, screen, text, font, color, max_width, dest):
@@ -153,11 +161,36 @@ class SpotifyClockView(BaseView):
     def draw(self, screen):
         screen.fill(COLOR_BG)
         
-        # 1. Draw World Clock
-        clock_str = self.world_clock_widget.get_display_string()
-        clock_surf = self.font_medium_bold.render(clock_str, True, COLOR_TEXT_SUB)
-        clock_rect = clock_surf.get_rect(topright=(self.width - self.margin, self.margin))
-        screen.blit(clock_surf, clock_rect)
+        # 1. Draw World Clock / Weather Header
+        active_city = self.world_clock_widget.clocks[self.world_clock_widget.clock_index]
+        prefix = "*" if active_city["name"] == self.world_clock_widget.reference_location else ""
+        
+        if self.show_clock and self.show_weather:
+            # Both: clock on top line, weather (no city name) on second line
+            clock_str = self.world_clock_widget.get_display_string()
+            clock_surf = self.font_medium_bold.render(clock_str, True, COLOR_TEXT_SUB)
+            clock_rect = clock_surf.get_rect(topright=(self.width - self.margin, self.margin))
+            screen.blit(clock_surf, clock_rect)
+            
+            weather_str = self.weather_widget.get_weather(active_city["name"], include_location=False)
+            weather_surf = self.font_small.render(weather_str, True, COLOR_TEXT_SUB)
+            weather_rect = weather_surf.get_rect(topright=(self.width - self.margin, clock_rect.bottom + 5))
+            screen.blit(weather_surf, weather_rect)
+            
+        elif self.show_clock:
+            # Clock only
+            clock_str = self.world_clock_widget.get_display_string()
+            clock_surf = self.font_medium_bold.render(clock_str, True, COLOR_TEXT_SUB)
+            clock_rect = clock_surf.get_rect(topright=(self.width - self.margin, self.margin))
+            screen.blit(clock_surf, clock_rect)
+            
+        elif self.show_weather:
+            # Weather only: weather with city prefix on first line
+            weather_str = self.weather_widget.get_weather(active_city["name"], include_location=True)
+            display_str = f"{prefix}{weather_str}"
+            weather_surf = self.font_medium_bold.render(display_str, True, COLOR_TEXT_SUB)
+            weather_rect = weather_surf.get_rect(topright=(self.width - self.margin, self.margin))
+            screen.blit(weather_surf, weather_rect)
         
         track_info = self.spotify_widget.track_info
         error_message = self.spotify_widget.error_message

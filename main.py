@@ -12,13 +12,25 @@ DEFAULT_WINDOW_HEIGHT = 600
 DEFAULT_FPS = 60
 
 class SpotifyDisplay:
-    def __init__(self, width=None, height=None, allow_dimming=None, fullscreen=None, fps=None, debug=False, config_path="configs.json"):
+    def __init__(self, width=None, height=None, allow_dimming=None, fullscreen=None, fps=None, show_clock=None, show_weather=None, debug=False, config_path="configs.json"):
         # 1. Load config
         self.config = self.load_config(config_path)
         self.debug = debug
 
         # Merge config settings with arguments
         self.window_cfg = self.config.setdefault("window", {})
+        
+        # Merge show_clock
+        if show_clock is not None:
+            self.config["show_clock"] = show_clock
+        else:
+            self.config.setdefault("show_clock", True)
+
+        # Merge show_weather
+        if show_weather is not None:
+            self.config["show_weather"] = show_weather
+        else:
+            self.config.setdefault("show_weather", False)
         
         self.width = width if width is not None else self.window_cfg.get("width", DEFAULT_WINDOW_WIDTH)
         self.height = height if height is not None else self.window_cfg.get("height", DEFAULT_WINDOW_HEIGHT)
@@ -137,6 +149,10 @@ if __name__ == "__main__":
     parser.add_argument("--fullscreen", action="store_true", help="Run the display in fullscreen mode")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--test-error", action="store_true", help="Simulate a Spotify API error for testing")
+    parser.add_argument("--show-clock", dest="show_clock", action="store_true", default=None, help="Show world clock")
+    parser.add_argument("--no-clock", dest="show_clock", action="store_false", default=None, help="Hide world clock")
+    parser.add_argument("--show-weather", dest="show_weather", action="store_true", default=None, help="Show weather report")
+    parser.add_argument("--no-weather", dest="show_weather", action="store_false", default=None, help="Hide weather report")
     
     args = parser.parse_args()
     
@@ -147,6 +163,8 @@ if __name__ == "__main__":
         allow_dimming=None if args.allow_dimming else False,
         fullscreen=True if args.fullscreen else None,
         fps=args.fps,
+        show_clock=args.show_clock,
+        show_weather=args.show_weather,
         debug=args.debug
     )
     display.run(test_error=args.test_error)

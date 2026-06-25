@@ -35,22 +35,19 @@ class WorldClockWidget:
         # Get Reference (Home) info
         home_city_cfg = next((c for c in self.clocks if c["name"] == self.reference_location), None)
         if not home_city_cfg:
-            # Fallback if reference location is not found in the list of clocks
             home_city_cfg = self.clocks[0]
             
         home_tz = pytz.timezone(home_city_cfg["tz"])
         home_time = now_utc.astimezone(home_tz)
         
-        # Get Current Cycle info
+        # Get Current City info
         city = self.clocks[self.clock_index]
         city_tz = pytz.timezone(city["tz"])
         city_time = now_utc.astimezone(city_tz)
         
-        # Format time: 10:42:05 and date: 15.05.26
         time_str = city_time.strftime("%H:%M:%S")
-        date_str = city_time.strftime("%d.%m.%y")
+        date_str = city_time.strftime("%d.%m.%Y")
         
-        # Day offset logic relative to home date
         day_offset = ""
         if city_time.date() > home_time.date():
             day_offset = " (+1)"
@@ -59,9 +56,7 @@ class WorldClockWidget:
             
         prefix = "*" if city["name"] == self.reference_location else ""
         
-        # Format: *CITY: HH:MM:SS | MM.DD (+1)
         display_str = f"{prefix}{city['name'].upper()}: {time_str} | {date_str}{day_offset}".lower()
-        # Ensure city code is still uppercase
         display_str = display_str.replace(city['name'].lower(), city['name'].upper())
         
         return display_str
