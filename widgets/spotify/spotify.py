@@ -37,9 +37,10 @@ def clean_track_name(name):
         return name
     
     keywords = [
-        r'feat\.?', r'featuring', r'with', r'remaster(ed)?', r'live', r'acoustic', 
+        r'feat\.?', r'ft\.?', r'featuring', r'with', r'remaster(ed)?', r'live', r'acoustic', 
         r'radio\s+edit', r'edit', r'bonus', r'single', r'deluxe', r'extended', 
-        r'original\s+mix', r'mix', r'version', r'instrumental', r'edition', r'mono', r'stereo'
+        r'original\s+mix', r'mix', r'version', r'instrumental', r'edition', r'mono', r'stereo',
+        r'from\s+.*?(?:series|tv\s+series|television\s+series|soundtrack|motion\s+picture|movie|anime|show|film|video\s+game)'
     ]
     
     keywords_pattern = '|'.join(keywords)
