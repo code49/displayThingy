@@ -40,7 +40,8 @@ def clean_track_name(name):
         r'feat\.?', r'ft\.?', r'featuring', r'with', r'remaster(ed)?', r'live', r'acoustic', 
         r'radio\s+edit', r'edit', r'bonus', r'single', r'deluxe', r'extended', 
         r'original\s+mix', r'mix', r'version', r'instrumental', r'edition', r'mono', r'stereo',
-        r'from\s+.*?(?:series|tv\s+series|television\s+series|soundtrack|motion\s+picture|movie|anime|show|film|video\s+game)'
+        r'from\s+.*?(?:series|tv\s+series|television\s+series|soundtrack|motion\s+picture|movie|anime|show|film|video\s+game)',
+        r"from\s+(?:['\"‘’“”]|&apos;|&quot;|&#39;|&#x27;|&#34;|&#x22;).+?(?:['\"‘’“”]|&apos;|&quot;|&#39;|&#x27;|&#34;|&#x22;)"
     ]
     
     keywords_pattern = '|'.join(keywords)
@@ -49,13 +50,13 @@ def clean_track_name(name):
         re.IGNORECASE
     )
     
-    hyphen_regex = re.compile(
-        r'\s*-\s*.*?(?:' + keywords_pattern + r').*',
+    separator_regex = re.compile(
+        r'(?:\s+[-\/]\s*|\s*[-\/]\s+)[^-/]*?(?:' + keywords_pattern + r').*',
         re.IGNORECASE
     )
     
     cleaned = name
-    cleaned = hyphen_regex.sub('', cleaned)
+    cleaned = separator_regex.sub('', cleaned)
     cleaned = paren_regex.sub('', cleaned)
     cleaned = cleaned.strip()
     return cleaned if cleaned else name
